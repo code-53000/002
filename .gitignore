@@ -53,10 +53,7 @@ __pycache__/
 .venv/
 venv/
 env/
-
-# Logs
-logs/
-*.log
+package-lock.json
 
 # IDE and editor
 .idea/
