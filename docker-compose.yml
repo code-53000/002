@@ -1,0 +1,89 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: uniform-cycle-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-secret}
+      MYSQL_DATABASE: ${DB_DATABASE:-uniform_cycle}
+      MYSQL_USER: ${DB_USERNAME:-uniform}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-uniform_secret}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - uniform-cycle-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  api:
+    build:
+      context: ./uniform-cycle-api
+      dockerfile: Dockerfile
+    container_name: uniform-cycle-api
+    restart: unless-stopped
+    working_dir: /var/www
+    volumes:
+      - ./uniform-cycle-api:/var/www
+      - ./nginx/php.ini:/usr/local/etc/php/conf.d/local.ini
+    environment:
+      - APP_ENV=${APP_ENV:-local}
+      - APP_DEBUG=${APP_DEBUG:-true}
+      - APP_KEY=${APP_KEY:-}
+      - DB_CONNECTION=mysql
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_DATABASE=${DB_DATABASE:-uniform_cycle}
+      - DB_USERNAME=${DB_USERNAME:-uniform}
+      - DB_PASSWORD=${DB_PASSWORD:-uniform_secret}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - uniform-cycle-network
+
+  web:
+    build:
+      context: ./uniform-cycle-web
+      dockerfile: Dockerfile
+      target: ${NODE_ENV:-development}
+    container_name: uniform-cycle-web
+    restart: unless-stopped
+    volumes:
+      - ./uniform-cycle-web:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=${NODE_ENV:-development}
+      - VITE_API_BASE_URL=http://localhost:8000/api
+    depends_on:
+      - api
+    networks:
+      - uniform-cycle-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: uniform-cycle-nginx
+    restart: unless-stopped
+    ports:
+      - "8000:80"
+      - "3000:3000"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - ./uniform-cycle-api/public:/var/www/public
+    depends_on:
+      - api
+      - web
+    networks:
+      - uniform-cycle-network
+
+volumes:
+  mysql_data:
+
+networks:
+  uniform-cycle-network:
+    driver: bridge
