@@ -54,6 +54,7 @@ services:
       target: ${NODE_ENV:-development}
     container_name: uniform-cycle-web
     restart: unless-stopped
+    command: npm run dev -- --host 0.0.0.0
     volumes:
       - ./uniform-cycle-web:/app
       - /app/node_modules
